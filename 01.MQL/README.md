@@ -262,7 +262,7 @@ count = {$count: "release_count"}
 doc = db.movies.aggregate([match, count])
 
 ```` 
-##### Simple Pipeline - match, project, limit, sort, count
+
 Project를 이용하여 출력 대상 데이터를 조정 합니다. 
 
 find에서 진행한 검색내용을 match, project, sort, limit 를 이용하여 작성 합니다.
@@ -313,20 +313,433 @@ doc = db.movies.aggregate([match1,match2, count])
 
 ##### Aggregation option
 
+Aggregation 수행에 
 
 
 
 ##### 배열 처리
+기본 문제열을 엘리먼트로 한 배열에 대한 처리를 합니다.   
+sample_mflix 데이터베이스의 movies 컬렉션에 영화 정보에 genres 필드에 장르 정보가 배열로 저장 되어 있습니다. 해당 내용 중 코미디와 드라마 장르의 영화를 검색 하여 봅니다.   
+데이터 출력은 영화 제목(title), 장르(genres) 항목만을 출력 합니다.
 
+
+```` 
+db = db.getSiblingDB("sample_mflix")
+
+match = {$match: {genres: {$all: ['Drama','Comedy']}}}
+project = {$project:{title:1, genres:1, _id:0}}
+
+db.movies.aggregate([match,project])
+
+```` 
+결과를 확인 하면 Comedy, Drama 두개가 포함된 영화만이 출력 됩니다.
+
+all을 이용하여 두개 장르에 포함된 영화를 검색 하였으나 Drama 혹은 Comedy 인 내용을 검색 합니다.
+
+```` 
+db = db.getSiblingDB("sample_mflix")
+
+match = {$match: {genres: {$in: ['Drama','Comedy']}}}
+project = {$project:{title:1, genres:1, _id:0}}
+
+db.movies.aggregate([match,project])
+
+```` 
+검색 내용을 확인 하면 장르 항목에 Drama 혹은 Comedy가 포함된 영화가 검색 됩니다.  
+
+문서가 배열로 되어 있는 경우의 검색을 합니다.  
+다음과 같이 데이터를 생성 하고 검색을 합니다.   
+
+```` 
+db = db.getSiblingDB("mql")
+db.students.deleteMany({})
+subjectgrade = [{
+      "_id" : 1,
+      "grades" : [
+         { "grade" : 80, "mean" : 75, "std" : 8 },
+         { "grade" : 85, "mean" : 90, "std" : 6 },
+         { "grade" : 85, "mean" : 85, "std" : 8 }
+      ]
+   },
+   {
+      "_id" : 2,
+      "grades" : [
+         { "grade" : 90, "mean" : 75, "std" : 8 },
+         { "grade" : 87, "mean" : 90, "std" : 5 },
+         { "grade" : 85, "mean" : 85, "std" : 6 }
+      ]
+   }
+]
+db.students.insertMany(subjectgrade)
+```` 
+
+grade가 85 이고 mean이 90인 데이터를 검색 합니다. 
+
+```` 
+match = {$match:{'grades.grade':85, 'grades.mean':90}}
+
+db.students.aggregate([match])
+[
+  {
+    _id: 1,
+    grades: [
+      { grade: 80, mean: 75, std: 8 },
+      { grade: 85, mean: 90, std: 6 },
+      { grade: 85, mean: 85, std: 8 }
+    ]
+  },
+  {
+    _id: 2,
+    grades: [
+      { grade: 90, mean: 75, std: 8 },
+      { grade: 87, mean: 90, std: 5 },
+      { grade: 85, mean: 85, std: 6 }
+    ]
+  }
+]
+```` 
+결과는 grade가 85 인것과 mean이 90인 것이 모두 검색 됩니다.
+
+배열로 되어 있는 내용에서 검색 하기 위해서는 unwind를 이용하여 검색 합니다.
+unwind는 배열로 되어 있는 element를 개별로 분리 합니다. 
+grade가 85이고 mean이 90인 검색 하기 위해 배열로 되어 있는 element를 분리 하고 검색 하여 줍니다.   
+
+```` 
+unwind={$unwind: "$grades"}
+
+match = {$match:{'grades.grade':85, 'grades.mean':90}}
+
+db.students.aggregate([unwind,match])
+```` 
+결과는 다음과 같이 출력 됩니다.
+
+```` 
+[ { _id: 1, grades: { grade: 85, mean: 90, std: 6 } } ]
+```` 
 
 ##### lookup - Join 이용하기
 
+sample_mflix 데이터베이스에는 comments 컬렉션과 users 컬렉션이 있습니다.  
+사용자가 생성한 코멘트에 대한 정보로 comments에 사용자 정보를 포함하고 있습니다. 
+users의 데이터 중 이름이 "Mercedes Tyler"인 사람을 찾아 그가 게시한 Comments 를 찾습니다.   
+
+해당 데이터를 검색 하면 다음과 같습니다.    
+users    
+````
+{
+  "_id": {
+    "$oid": "59b99dedcfa9a34dcd78862d"
+  },
+  "name": "Mercedes Tyler",
+  "email": "mercedes_tyler@fakegmail.com",
+  "password": "$2b$12$ONDwIwR9NKF1Tp5GjGI12e8OFMxPELoFrk4x4Q3riJGWY6jl/UZAa"
+}
+````
+
+comments 의 경우 다음과 같습니다.
+````
+[{
+  "_id": {
+    "$oid": "5a9427648b0beebeb69579e7"
+  },
+  "name": "Mercedes Tyler",
+  "email": "mercedes_tyler@fakegmail.com",
+  "movie_id": {
+    "$oid": "573a1390f29313caabcd4323"
+  },
+  "text": "Eius veritatis vero facilis quaerat fuga temporibus. Praesentium expedita sequi repellat id. Corporis minima enim ex. Provident fugit nisi dignissimos nulla nam ipsum aliquam.",
+  "date": {
+    "$date": {
+      "$numberLong": "1029646567000"
+    }
+  }
+},
+...
+]
+````
+
+Lookup 의 사용 옵션은 다음과 같습니다. (let, pipeline은 5.0이상 에서 사용 가능 합니다.)  
+````
+{
+   $lookup:
+      {
+         from: <foreign collection>,
+         localField: <field from local collection's documents>,
+         foreignField: <field from foreign collection's documents>,
+         let: { <var_1>: <expression>, …, <var_n>: <expression> },
+         pipeline: [ <pipeline to run> ],
+         as: <output array field>
+      }
+}
+````
+
+SQL과 비교 하면 다음과 같습니다.
+
+````
+SELECT *, <output array field>
+FROM localCollection
+WHERE <output array field> IN (
+   SELECT <documents as determined from the pipeline>
+   FROM <foreignCollection>
+   WHERE <foreignCollection.foreignField> = <localCollection.localField>
+   AND <pipeline match condition>
+);
+````
+
+Lookup을 이용하여 "Mercedes Tyler"가 작성한 Comment를 조회 합니다. user 컬렉션의 이메일과 comments에 이메일 정보가 같은 데이터 만을 조회 합니다.  
+Lookup 내의 pipeline에 match를 사용하는 경우 $expr을 이용해야 합니다. 
+출력은 사용자 이름과 이메일, 작성한 코멘트를 출력 하여 줍니다.  
+
+````
+match={$match:{name:"Mercedes Tyler"}}
+
+lookup={$lookup:{from:"comments", let:{useremail:"$email"}, pipeline: [{$match:{$expr:{$eq:["$email","$$useremail"]}}},{$project:{text:1,email:1,date:1,_id:0}}], localField:"name",foreignField:"name", as:"Comments"}}
+
+project= {$project:{_id:0, password:0}}
+
+db.users.aggregate([match,lookup,project])
+````
+
+사용자 Mercede Tyler가 작성한 코멘트에 대한 정보가 Comments 필드에 배열로 출력 되는 것을 확인 할 수 있습니다.   
 
 ##### Group 만들기
+데이터를 그룹으로 집계하여 조회 합니다. 
+영화 정보 컬렉션에서 2010년에 나온 영화의 갯수를 조회 하기 위해서는 데이터를 그룹화 하는 것이 필요 합니다.  
+group 의 사용 방법은 다음과 같습니다.  
+````
+{
+ $group:
+   {
+     _id: <expression>, // Group key
+     <field1>: { <accumulator1> : <expression1> },
+     ...
+   }
+}
+````
+SQL의 group by와 유사하며 출력되는 필드에 대해서는 accumulate가 필요 합니다.  
+
+2010년에 나온 영화의 개수 조회는 다음과 같습니다. 
+
+````
+match={$match:{year:2010}}
+
+group={$group:{_id:'$year',totalCount:{$sum:'$year'}}}
+````
+내부 필드에 대해서 데이터를 기준으로 한 데이터 집계를 사용 하여 봅니다.
+영화 데이터를 출시 연도별로 집계 하고 runtime 에 대한 평균, 최대, 최소 시간을 출력 하여 줍니다.  
+
+````
+group={$group:{_id:'$year',avgRuntime:{$avg:'$runtime'}, maxRuntime:{$max:'$runtime'}, minRuntime:{$min:'$runtime'}}}
+````
+
+Aggregation을 이용한 데이터 집계는 SQL와 달리 집계되는 데이터를 배열 형태로 표시 할 수 있습니다. Acculate에 $addToSet을 이용하는 경우 그룹화된 데이터가 배열 형태로 출력이 됩니다. 
+runtime 집계에 영화의 타입이 어떤 것이 있는지를 추가 하여 조회 합니다. 영화 type은 movie, series의 값이 있습니다. 
+
+````
+group={$group:{_id:'$year',avgRuntime:{$avg:'$runtime'}, maxRuntime:{$max:'$runtime'}, minRuntime:{$min:'$runtime'},genres:{$addToSet:'$type'}}}
+
+db.movies.aggregate([group])
+````
+
+출력 결과를 확인 하면 데이터가 movie, series가 중복으로 들어가 있지 않는 형태로 배열 값으로 집계되는 것을 확인 할 수 있습니다.
+
+데이터 집계시 값의 범위를 이용한 집계 방법도 제공 합니다. 
+출시된 영화를 10년 단위로 집계 하여 봅니다. 
+Bucket을 이용하여 1960~1969,1970~1979 형태로 출시 년도에 대한 집계 범위를 지정 하여 집계 합니다. 
+
+bucket의 사용 방법은 다음과 같습니다.
+
+````
+{
+  $bucket: {
+      groupBy: <expression>,
+      boundaries: [ <lowerbound1>, <lowerbound2>, ... ],
+      default: <literal>,
+      output: {
+         <output1>: { <$accumulator expression> },
+         ...
+         <outputN>: { <$accumulator expression> }
+      }
+   }
+}
+
+````
+조회 하기 위한 범위 조건을 boundaries에 입력 하여 줍니다.  
+
+````
+bucket = {$bucket:{groupBy:'$year', boundaries: [1900,1910,1920,1930,1940,1950,1960,1970,1980,1990,2000,2010,2020], default:'Other',output:{countOfMovies:{$sum:1},avgRuntime:{$avg:'$runtime'}, maxRuntime:{$max:'$runtime'}, minRuntime:{$min:'$runtime'},years:{$addToSet:'$year'}}}}
+
+db.movies.aggregate([bucket])
+````
+
+결과를 확인 하면 10년 단위로 데이터를 그룹화한 것을 확인 할 수 있습니다.
 
 
 ##### 데이터 변경
+데이터를 조회 하면서
 
 
+##### 뷰 생성 하기
+MongoDB는 2가지 형태 뷰를 제공 합니다.
+Standard View
+데이터를 읽기 작업을 진행 할 때 뷰의 데이터가 계산 되어 별도의 디스크를 사용 하지 않습니다.
+Standard View는 기존 컬렉션의 인덱스를 사용하며 별도로 인덱스를 생성하거나 변경은 불가합니다. 
+Ondemand View
+$merge, $out을 이용하여 데이터를 디스크에 저장하는 형태 입니다.
+별도의 디스크에 저장되기 때문에 인덱스를 생성 할 수 있으며 Standard view와 달리 데이터 조회시 연산이 필요 없기 때문에 읽기 성능이 좋습니다.
 
-##### 데이터 추출
+개인 정보를 포함하는 데이터를 제외하기 위한 Standard view
+
+뷰를 생성하기 위한 방법은 다음과 같습니다.
+
+````
+db.createView ( <view> , <source> , <pipeline> ..)
+
+````
+Pipeline 항목에 뷰를 위한 처리 stage를 작성 하여 줍니다.  
+
+뷰의 사용 사례 중 하나는 개인 정보를 포함하는 정보를 제외하고 조회 하거나 전체 데이터가 노출 되지 않도록 하여야 합니다. 
+컬렉션에는 원본 데이터가 저장되어 있고 뷰를 이용하여 일부 민감 데이터에 대한 보안 처리를 할 수 있습니다.  
+
+Sample_mflix 데이터베이스에 users 컬렉션에 사용자와 이메일 암호화된 비밀번호를 저장 하고 있습니다.  
+이메일 주소의 아이디 일부분을 '***'로 가리고 이메일 도메인 만을 표시하여 개인 정보를 보호하는 뷰를 작성 합니다.   
+
+
+````
+db = db.getSiblingDB("sample_mflix")
+
+emailMask = {'$project':{'email':{ $concat: [{ $substrCP: ["$email", 0, 2] }, "****@", { $arrayElemAt: [{ $split: ["$email", "@"] }, 1] }] }, name:1, password:1}}
+
+db.createCollection('maskUsers',{'viewOn':'users',pipeline:[emailMask]})
+
+db.maskUsers.find()
+
+````
+
+결과를 확인 하면 이메일 중 일부가 가려진 형태로 조회 되며 원본에 대한 조회 권한을 제안하여 개인 정보를 보호 합니다.
+
+권한은 이용한 데이터 조회 권한 설정
+MongoDB 7.0부터 USER_ROLES 시스템 변수가 추가되어 이를 이용하여 데이터 접근에 대한 제어가 가능 합니다.
+
+users의 이메일 항목에 대해 접근 권한이 있는 경우 email 항목을 조회 할 수 있으며 그외에는 해당 항목 조회가 제한 됩니다.
+
+email 필드에 대해 액세스 할 수 있는 PERSONAL_ACCESS 역할을 가지는 person 사용자
+
+<img src="/01.MQL/images/image01.png" width="90%" height="90%">   
+
+역할을 생성 합니다.
+
+<img src="/01.MQL/images/image02.png" width="90%" height="90%">   
+
+사용자를 생성 하여 줍니다. 이때 생성한 권한을 부여 하여 줍니다.
+
+users 컬렉션에 PERSONAL_ACCESS 권한을 가진 경우만 email을 항목을 조회 할 수 있는 뷰를 생성 합니다.
+
+````
+emailMask = {$set: {"email": {$cond: { if:{$in:["PERSONAL_ACCESS","$$USER_ROLES.role"]}, then:"$email", else:"$$REMOVE"}}}}
+
+db.createView('roleUser','users',[emailMask])
+
+emailMask = {$set: {"email": {$cond: { if:{$in:["PERSONAL_ACCESS","$$USER_ROLES.role"]}, then:"$email", else:"$$REMOVE"}}}}
+{
+  '$set': {
+    email: {
+      '$cond': {
+        if: { '$in': [ 'PERSONAL_ACCESS', '$$USER_ROLES.role' ] },
+        then: '$email',
+        else: '$$REMOVE'
+      }
+    }
+  }
+}
+
+db.createView('roleUser','users',[emailMask])
+
+db.roleUser.find().limit(5)
+
+
+````
+
+결과를 확인 하면 다음과 같이 email 항목이 제외 된것을 볼 수 있습니다.
+
+````
+[
+  {
+    _id: ObjectId("59b99db4cfa9a34dcd7885b6"),
+    name: 'Ned Stark',
+    password: '$2b$12$UREFwsRUoyF0CRqGNK0LzO0HM/jLhgUCNNIJ9RJAqMUQ74crlJ1Vu'
+  },
+  {
+    _id: ObjectId("59b99db4cfa9a34dcd7885b7"),
+    name: 'Robert Baratheon',
+    password: '$2b$12$yGqxLG9LZpXA2xVDhuPnSOZd.VURVkz7wgOLY3pnO0s7u2S1ZO32y'
+  },
+  {
+    _id: ObjectId("59b99db5cfa9a34dcd7885b8"),
+    name: 'Jaime Lannister',
+    password: '$2b$12$6vz7wiwO.EI5Rilvq1zUc./9480gb1uPtXcahDxIadgyC3PS8XCUK'
+  },
+  {
+    _id: ObjectId("59b99db5cfa9a34dcd7885b9"),
+    name: 'Catelyn Stark',
+    password: '$2b$12$fiaTH5Sh1zKNFX2i/FTEreWGjxoJxvmV7XL.qlfqCr8CwOxK.mZWS'
+  },
+  {
+    _id: ObjectId("59b99db6cfa9a34dcd7885ba"),
+    name: 'Cersei Lannister',
+    password: '$2b$12$FExjgr7CLhNCa.oUsB9seub8mqcHzkJCFZ8heMc8CeIKOZfeTKP8m'
+  }
+]
+
+````
+
+PERSONAL_ACCESS 권한을 가지고 있는 person 사용자로 변경하고 데이터를 조회 합니다.
+
+````
+use admin
+
+db.auth('person')
+
+use sample_mflix
+
+db.roleUser.find().limit(5)
+
+````
+
+조회된 데이터를 확인 하면 다음과 같이 email이 포함되어 있는 것을 확인 할 수 있습니다.
+
+````
+[
+  {
+    _id: ObjectId("59b99db4cfa9a34dcd7885b6"),
+    name: 'Ned Stark',
+    email: 'sean_bean@gameofthron.es',
+    password: '$2b$12$UREFwsRUoyF0CRqGNK0LzO0HM/jLhgUCNNIJ9RJAqMUQ74crlJ1Vu'
+  },
+  {
+    _id: ObjectId("59b99db4cfa9a34dcd7885b7"),
+    name: 'Robert Baratheon',
+    email: 'mark_addy@gameofthron.es',
+    password: '$2b$12$yGqxLG9LZpXA2xVDhuPnSOZd.VURVkz7wgOLY3pnO0s7u2S1ZO32y'
+  },
+  {
+    _id: ObjectId("59b99db5cfa9a34dcd7885b8"),
+    name: 'Jaime Lannister',
+    email: 'nikolaj_coster-waldau@gameofthron.es',
+    password: '$2b$12$6vz7wiwO.EI5Rilvq1zUc./9480gb1uPtXcahDxIadgyC3PS8XCUK'
+  },
+  {
+    _id: ObjectId("59b99db5cfa9a34dcd7885b9"),
+    name: 'Catelyn Stark',
+    email: 'michelle_fairley@gameofthron.es',
+    password: '$2b$12$fiaTH5Sh1zKNFX2i/FTEreWGjxoJxvmV7XL.qlfqCr8CwOxK.mZWS'
+  },
+  {
+    _id: ObjectId("59b99db6cfa9a34dcd7885ba"),
+    name: 'Cersei Lannister',
+    email: 'lena_headey@gameofthron.es',
+    password: '$2b$12$FExjgr7CLhNCa.oUsB9seub8mqcHzkJCFZ8heMc8CeIKOZfeTKP8m'
+  }
+]
+
+````
