@@ -6,18 +6,13 @@
 ### MQL
 
 #### Reviewing Query
-Mongosh을 이용하여 배포된 클러스터에 접속 후 다음을 실행 하여 줍니다.
-
+기본적인 MQL을 이용한 데이터 조회를 진행 합니다.  
+Mongosh을 이용하여 배포된 클러스터에 접속 후 다음을 실행 하여 줍니다.   
 Aggregation을 진행 하기 전에 MQL의 find를 이용하여 데이터를 filter하고 데이터를 정렬 할 수 있습니다.  
 
-##### Basic MQL 작성
+##### 1. Basic MQL 작성
 
-filter
-projection
-sort
-
-find operation에서 원하는 데이터만을 반환 받기 위한 방법으로 기본적인 내용을 리뷰 합니다.
-
+find operation에서 원하는 데이터만을 반환 받기 위한 방법으로 기본적인 내용을 리뷰 합니다.   
 sample_mflix 데이터베이스의 movies 컬렉션에서 1933년에 개봉한 영화 중 가장 많은 상을 수상한 영화를 반환하는 쿼리를 작성 하고, title과 award 내용을 출력 합니다.   
 
 결과는 다음과 같습니다.  
@@ -46,12 +41,12 @@ doc = db.movies.find(query,projection).sort(sortOrder).limit(1).toArray()
 ```` 
 
 
-##### $elemMatch를 이용
+##### 2. $elemMatch를 이용
 
-MQL의 구조는 단순하여 사용이 어렵지 않습니다. 이 중 유용한 기능은 $elemMatch 입니다.
-$elemMatch 연산자는 배열에 대해 쿼리하는데 사용되며 scope를 연산하는데에 사용 됩니다. 
+MQL의 구조는 단순하여 사용이 어렵지 않습니다. 이 중 유용한 기능은 $elemMatch 입니다.    
+$elemMatch 연산자는 문서가 배열로 되어 있는 경우 쿼리하는데 유용하게 사용 할 수 있습니다.      
 
-다음과 같이 간단한 이름을 정보를 저장한 데이터를 작성 합니다. 
+다음과 같이 간단한 이름을 정보를 저장한 데이터를 작성 합니다.   
 
 ```` 
 r = {
@@ -88,13 +83,24 @@ db.a.find({"people.firstname":"john","people.lastname":"doe"})
 배열내의 엘리먼트에서 검색하는 경우 firstname에 "john"이 있는지 검색하고 lastname에 "doe"가 있는 지 검색 하게 되어 원하는 검색 결과가 출력 되지 않습니다. 
 정확한 이름으로 검색 하기 위해서는 $elemMatch를 이용하여 검색 합니다. 
 
+$elemMatch 의 사용방법은 다음과 같습니다.  
+
+```` 
+{ <field>: { $elemMatch: { <query1>, <query2>, ... } } }
+```` 
+
+firstname과 lastname 이 "john doe" 인 사람을 $elemMatch를 이용하여 검색 합니다.  
+
 ```` 
 db.a.find({people : { $elemMatch : { firstname: "john", lastname:"doe"}}})
 ```` 
 이 경우 배열내에서 firstname이 "john" 이고 lastname이 "doe"를 동시에 만족하는 데이터를 검색 하여 원하는 데이터를 참게 됩니다. 이를 이용하여 Array내에 nested document에 대해서도 원하는 검색 조건을 작성 할 수 있습니다.   
 
 
-##### Array Handling $[identifier]
+##### 3. Array Handling $[identifier]
+
+배열로 되어 있는 필드에 대해 데이터를 수정 하기 위해서 배열에 대한 데이터를 지정하여 수정 하는 것이 필요 합니다.   
+$[identifier]는 배열내의 데이터를 지정하여 데이터를 수정 할 수 있습니다.   
 배열 내에서 $[]은 내부의 모든 데이터를 선택 하는 것입니다. 배열내의 데이터를 수정 할 때 모든 엘리먼트에 적용 하기 위해서는 다음과 같이 Query를 작성 합니다.   
 
 ```` 
@@ -239,7 +245,7 @@ db.students.find()
 
 ### Aggregation
 
-##### Simple Pipeline - match, project, limit, sort, count
+##### 1. Simple Pipeline - match, project, limit, sort, count
 
 MQL의 find와 유사하게 작성 합니다. stage를 pipeline으로 연결 하는 형태가 다른점입니다. 구조적으로 작성이 되기 때문에 개발 및 디버깅이 편한 장점이 있습니다.  
 
@@ -259,7 +265,8 @@ db = db.getSiblingDB("sample_mflix")
 
 match = {$match: {year:2010}}
 count = {$count: "release_count"}
-doc = db.movies.aggregate([match, count])
+
+db.movies.aggregate([match, count])
 
 ```` 
 
@@ -279,7 +286,7 @@ project = {$project:{_id:0,"title":1, "awards.wins":1}}
 sort = {$sort:{"awards.wins":-1}}
 limit = {$limit: 1}
 
-doc = db.movies.aggregate([match, project, sort, limit])
+db.movies.aggregate([match, project, sort, limit])
 
 ```` 
 
@@ -301,7 +308,7 @@ match1 = {$match:{genres:'Drama'}}
 match2 = {$match:{year:2000}}
 count = {$count: 'numberOfDrama'}
 
-doc = db.movies.aggregate([match1,match2, count])
+db.movies.aggregate([match1,match2, count])
 
 ```` 
 
@@ -311,13 +318,8 @@ doc = db.movies.aggregate([match1,match2, count])
 ````
 
 
-##### Aggregation option
 
-Aggregation 수행에 
-
-
-
-##### 배열 처리
+##### 2. 배열 처리
 기본 문제열을 엘리먼트로 한 배열에 대한 처리를 합니다.   
 sample_mflix 데이터베이스의 movies 컬렉션에 영화 정보에 genres 필드에 장르 정보가 배열로 저장 되어 있습니다. 해당 내용 중 코미디와 드라마 장르의 영화를 검색 하여 봅니다.   
 데이터 출력은 영화 제목(title), 장르(genres) 항목만을 출력 합니다.
@@ -400,7 +402,46 @@ db.students.aggregate([match])
 ```` 
 결과는 grade가 85 인것과 mean이 90인 것이 모두 검색 됩니다.
 
+$elemMatch를 이용하여 검색을 합니다.
+
+```` 
+elemmatch = {$match: {grades:{"$elemMatch":{"grade":85,"mean":90}}}}
+
+db.students.aggregate([elemmatch])
+```` 
+
+결과는 조회 조건에 만족하는 한건의 데이터가 조회 됩니다.
+
+```` 
+[
+  {
+    _id: 1,
+    grades: [
+      { grade: 80, mean: 75, std: 8 },
+      { grade: 85, mean: 90, std: 6 },
+      { grade: 85, mean: 85, std: 8 }
+    ]
+  }
+]
+
+```` 
+
+추가 적인 방법으로 배열의 데이터를 개별로 분리 하여 처리를 하여 봅니다.  
 배열로 되어 있는 내용에서 검색 하기 위해서는 unwind를 이용하여 검색 합니다.
+
+$unwind의 사용 방법은 다음과 같습니다. 
+includeArrayIndex를 지정하면 배열의 index를 추가 하며 perserveNullAndEmptyArrays를 이용하여 array 값이 null 혹은 empty있더라도 데이터를 리턴 하게 합니다.  
+```` 
+{
+  $unwind:
+    {
+      path: <field path>,
+      includeArrayIndex: <string>,
+      preserveNullAndEmptyArrays: <boolean>
+    }
+}
+```` 
+
 unwind는 배열로 되어 있는 element를 개별로 분리 합니다. 
 grade가 85이고 mean이 90인 검색 하기 위해 배열로 되어 있는 element를 분리 하고 검색 하여 줍니다.   
 
@@ -417,14 +458,15 @@ db.students.aggregate([unwind,match])
 [ { _id: 1, grades: { grade: 85, mean: 90, std: 6 } } ]
 ```` 
 
-##### lookup - Join 이용하기
+##### 3. lookup - Join 이용하기
 
 sample_mflix 데이터베이스에는 comments 컬렉션과 users 컬렉션이 있습니다.  
 사용자가 생성한 코멘트에 대한 정보로 comments에 사용자 정보를 포함하고 있습니다. 
 users의 데이터 중 이름이 "Mercedes Tyler"인 사람을 찾아 그가 게시한 Comments 를 찾습니다.   
 
 해당 데이터를 검색 하면 다음과 같습니다.    
-users    
+
+users 컬렉션       
 ````
 {
   "_id": {
@@ -491,6 +533,8 @@ Lookup 내의 pipeline에 match를 사용하는 경우 $expr을 이용해야 합
 출력은 사용자 이름과 이메일, 작성한 코멘트를 출력 하여 줍니다.  
 
 ````
+db = db.getSiblingDB("mql")
+
 match={$match:{name:"Mercedes Tyler"}}
 
 lookup={$lookup:{from:"comments", let:{useremail:"$email"}, pipeline: [{$match:{$expr:{$eq:["$email","$$useremail"]}}},{$project:{text:1,email:1,date:1,_id:0}}], localField:"name",foreignField:"name", as:"Comments"}}
@@ -502,7 +546,7 @@ db.users.aggregate([match,lookup,project])
 
 사용자 Mercede Tyler가 작성한 코멘트에 대한 정보가 Comments 필드에 배열로 출력 되는 것을 확인 할 수 있습니다.   
 
-##### Group 만들기
+##### 4. Group 만들기
 데이터를 그룹으로 집계하여 조회 합니다. 
 영화 정보 컬렉션에서 2010년에 나온 영화의 갯수를 조회 하기 위해서는 데이터를 그룹화 하는 것이 필요 합니다.  
 group 의 사용 방법은 다음과 같습니다.  
@@ -575,20 +619,18 @@ db.movies.aggregate([bucket])
 결과를 확인 하면 10년 단위로 데이터를 그룹화한 것을 확인 할 수 있습니다.
 
 
-##### 데이터 변경
-데이터를 조회 하면서
+##### 5. 뷰 생성 하기
+MongoDB는 2가지 형태 뷰를 제공 합니다.    
 
+Standard View    
+데이터를 읽기 작업을 진행 할 때 뷰의 데이터가 계산 되어 별도의 디스크를 사용 하지 않습니다.    
+Standard View는 기존 컬렉션의 인덱스를 사용하며 별도로 인덱스를 생성하거나 변경은 불가합니다.    
 
-##### 뷰 생성 하기
-MongoDB는 2가지 형태 뷰를 제공 합니다.
-Standard View
-데이터를 읽기 작업을 진행 할 때 뷰의 데이터가 계산 되어 별도의 디스크를 사용 하지 않습니다.
-Standard View는 기존 컬렉션의 인덱스를 사용하며 별도로 인덱스를 생성하거나 변경은 불가합니다. 
-Ondemand View
-$merge, $out을 이용하여 데이터를 디스크에 저장하는 형태 입니다.
-별도의 디스크에 저장되기 때문에 인덱스를 생성 할 수 있으며 Standard view와 달리 데이터 조회시 연산이 필요 없기 때문에 읽기 성능이 좋습니다.
+Ondemand View    
+$merge, $out을 이용하여 데이터를 디스크에 저장하는 형태 입니다.    
+별도의 디스크에 저장되기 때문에 인덱스를 생성 할 수 있으며 Standard view와 달리 데이터 조회시 연산이 필요 없기 때문에 읽기 성능이 좋습니다.   
 
-개인 정보를 포함하는 데이터를 제외하기 위한 Standard view
+Standard View를 이용하여 개인 정보를 포함하는 데이터를 제외하기 조회 하는 View를 생성 합니다.   
 
 뷰를 생성하기 위한 방법은 다음과 같습니다.
 
@@ -596,13 +638,14 @@ $merge, $out을 이용하여 데이터를 디스크에 저장하는 형태 입�
 db.createView ( <view> , <source> , <pipeline> ..)
 
 ````
+
 Pipeline 항목에 뷰를 위한 처리 stage를 작성 하여 줍니다.  
 
-뷰의 사용 사례 중 하나는 개인 정보를 포함하는 정보를 제외하고 조회 하거나 전체 데이터가 노출 되지 않도록 하여야 합니다. 
-컬렉션에는 원본 데이터가 저장되어 있고 뷰를 이용하여 일부 민감 데이터에 대한 보안 처리를 할 수 있습니다.  
+뷰의 사용 사례 중 하나는 개인 정보를 포함하는 정보를 제외하고 조회 하거나 전체 데이터가 노출 되지 않도록 하여야 합니다.   
+컬렉션에는 원본 데이터가 저장되어 있고 뷰를 이용하여 일부 민감 데이터에 대한 보안 처리를 할 수 있습니다.   
 
-Sample_mflix 데이터베이스에 users 컬렉션에 사용자와 이메일 암호화된 비밀번호를 저장 하고 있습니다.  
-이메일 주소의 아이디 일부분을 '***'로 가리고 이메일 도메인 만을 표시하여 개인 정보를 보호하는 뷰를 작성 합니다.   
+Sample_mflix 데이터베이스에 users 컬렉션에 사용자와 이메일 암호화된 비밀번호를 저장 하고 있습니다.   
+이메일 주소의 아이디 일부분을 '***'로 가리고 이메일 도메인 만을 표시하여 개인 정보를 보호하는 뷰를 작성 합니다.    
 
 
 ````
@@ -618,8 +661,9 @@ db.maskUsers.find()
 
 결과를 확인 하면 이메일 중 일부가 가려진 형태로 조회 되며 원본에 대한 조회 권한을 제안하여 개인 정보를 보호 합니다.
 
-권한은 이용한 데이터 조회 권한 설정
-MongoDB 7.0부터 USER_ROLES 시스템 변수가 추가되어 이를 이용하여 데이터 접근에 대한 제어가 가능 합니다.
+##### 6. Role을 이용한 뷰 생성 하기 (Option)
+
+MongoDB 7.0부터 USER_ROLES 시스템 변수가 추가되어 이를 이용하여 데이터 접근에 대한 제어가 가능 합니다. (해당 기능은 Freetier에서 제공되지 않습니다.)    
 
 users의 이메일 항목에 대해 접근 권한이 있는 경우 email 항목을 조회 할 수 있으며 그외에는 해당 항목 조회가 제한 됩니다.
 
