@@ -96,8 +96,82 @@ db.a.find({people : { $elemMatch : { firstname: "john", lastname:"doe"}}})
 ```` 
 이 경우 배열내에서 firstname이 "john" 이고 lastname이 "doe"를 동시에 만족하는 데이터를 검색 하여 원하는 데이터를 참게 됩니다. 이를 이용하여 Array내에 nested document에 대해서도 원하는 검색 조건을 작성 할 수 있습니다.   
 
+##### 3. Array Handling $
 
-##### 3. Array Handling $[identifier]
+배열로 구성된 데이터를 처리 하기 위해서는 배열 위치 값을 이용하거나 위치 연산자 ($)를 이용하는 방법이 있다. 
+배열 위치를 이용하는 방법은 배열에 배열 인덱스(0부터 시작)를 이용하여 지정 하는 방법 입니다.   
+
+````
+db = db.getSiblingDB("mql")
+db.students.deleteMany({})
+grades =  [
+   { "_id" : 1, "grades" : [ 95, 92, 90 ] },
+   { "_id" : 2, "grades" : [ 98, 100, 102 ] },
+   { "_id" : 3, "grades" : [ 95, 110, 100 ] }
+]
+db.students.insertMany( grades )
+```` 
+
+배열내에 2번째 값에 10을 증가 시켜 봅니다.
+
+````
+db.students.updateOne({},{$inc:{"grades.1":10}})
+```` 
+
+그 결과는 다음과 같이 한개의 열에 2번째 값이 10 증가된 것을 확인 할 수 있습니다.
+
+````
+db.students.find()
+[
+  { _id: 1, grades: [ 95, 102, 90 ] },
+  { _id: 2, grades: [ 98, 100, 102 ] },
+  { _id: 3, grades: [ 95, 110, 100 ] }
+]
+```` 
+
+이 방법은 배열내의 요소를 쿼리 한 후 순번을 확인 하고 나서 작업을 진행 하여야 합니다.   
+$를 이용하는 방법은 쿼리에 위치를 알아내고 수행 하는 방법 입니다.   
+
+$의 연산자 형태는 다음과 같습니다. 
+
+
+```` 
+{ "<array>.$" : value }
+```` 
+
+동일한 학생 성적 데이터를 생성 하고 이중 성적이 92인 데이터를 찾아 10을 증가 시켜 줍니다.   
+
+````
+db = db.getSiblingDB("mql")
+db.students.deleteMany({})
+grades =  [
+   { "_id" : 1, "grades" : [ 95, 92, 90 ] },
+   { "_id" : 2, "grades" : [ 98, 100, 102 ] },
+   { "_id" : 3, "grades" : [ 95, 110, 100 ] }
+]
+db.students.insertMany( grades )
+```` 
+
+$은 검색된 결과위치로 첫번째 결과가 지정 됩니다.  
+
+````
+db.students.updateOne({grades:92}, {$inc:{"grades.$":10}})
+
+```` 
+
+결과는 다음과 같이 성적이 92인 항목이 10이 증가된 것을 확인 할 수 있습니다.  
+
+````
+db.students.find()
+[
+  { _id: 1, grades: [ 95, 102, 90 ] },
+  { _id: 2, grades: [ 98, 100, 102 ] },
+  { _id: 3, grades: [ 95, 110, 100 ] }
+]  
+```` 
+
+
+##### 4. Array Handling $[identifier]
 
 배열로 되어 있는 필드에 대해 데이터를 수정 하기 위해서 배열에 대한 데이터를 지정하여 수정 하는 것이 필요 합니다.   
 $[identifier]는 배열내의 데이터를 지정하여 데이터를 수정 할 수 있습니다.   
@@ -132,7 +206,8 @@ db.students.updateMany(
 
 그 결과를 확인 하면 배열내의 모든 데이터의 값이 10이 감소된 것을 확인 할 수 있습니다.
 ````
-Atlas atlas-12kwtk-shard-0 [primary] mql> db.students.find()
+db.students.find()
+
 [
   { _id: 1, grades: [ 85, 82, 80 ] },
   { _id: 2, grades: [ 88, 90, 92 ] },
@@ -150,7 +225,8 @@ arrayFilters 옵션과 함께 사용 하여 연산자의 형태는 다음과 같
 { arrayFilters: [ { <identifier>: <condition> } ] }
 ```` 
 
-다음과 같이 배열을 포함하는 데이터를 생성 하여 줍니다.
+우선 데이터가 배열로 구성된 필드에 대한 처리를 합니다.   
+다음과 같이 학생별로 성적 데이터를 배열로 가지는 데이터를 생성 하여 줍니다.   
 
 ````
 db = db.getSiblingDB("mql")
@@ -163,7 +239,8 @@ grades =  [
 db.students.insertMany( grades )
 ```` 
 
-grades 배열에서 100보다 크거나 같은 모든 요소를 업데이트 하려면 arrayFilters와 함께 필터링된 위치 연산자 $[identifier]를 사용 합니다.
+grades 값이 100 보다 넘는 데이터가 있는 것을 확인 할 수 있으며 이를 100으로 수정 작업을 진행 합니다.    
+grades 배열에서 100보다 크거나 같은 모든 요소를 업데이트 하려면 arrayFilters와 함께 필터링된 위치 연산자 $[identifier]를 사용 합니다.   
 
 ```` 
 db.students.updateMany(
@@ -184,8 +261,10 @@ db.students.find()
 ]
 ```` 
 
-배열내에 엘리먼트가 document형태인 경우 동일 하게 동작 합니다. 
-과목별로 성적 데이터를 작성 합니다. 
+두번 째로 Document가 배열로 구성된 필드에 대한 처리를 수행 합니다.   
+배열내에 엘리먼트가 document형태인 경우 동일 하게 동작 합니다.  
+다음과 같이 학생별로 성적 및 등급 데이터를 문서화 하여 배열로 가지는 데이터를 작성 합니다.    
+
 ```` 
 db = db.getSiblingDB("mql")
 db.students.deleteMany({})
@@ -209,7 +288,8 @@ subjectgrade = [{
 db.students.insertMany(subjectgrade)
 ```` 
 
-데이터 중 grade가 85보다 큰 데이터 찾아 평균(mean)값을 100으로 수정 하는 Query를 작성 합니다.  
+데이터 중 grade가 85보다 큰 데이터 찾아 평균(mean)값을 100으로 수정 하는 Query를 작성 합니다.   
+
 ```` 
 db.students.updateMany(
    { },
