@@ -49,6 +49,7 @@ $elemMatch 연산자는 문서가 배열로 되어 있는 경우 쿼리하는데
 다음과 같이 간단한 이름을 정보를 저장한 데이터를 작성 합니다.   
 
 ```` 
+db = db.getSiblingDB("mql")
 r = {
   people : [
           { firstname: "john", lastname: "wayne" },
@@ -613,7 +614,7 @@ Lookup 내의 pipeline에 match를 사용하는 경우 $expr을 이용해야 합
 출력은 사용자 이름과 이메일, 작성한 코멘트를 출력 하여 줍니다.  
 
 ````
-db = db.getSiblingDB("mql")
+db = db.getSiblingDB("sample_mflix")
 
 match={$match:{name:"Mercedes Tyler"}}
 
